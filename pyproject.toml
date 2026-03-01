@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "expardus-tracing"
+version = "0.2.0"
+description = "Shared distributed tracing library for the exPardus ecosystem"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+dependencies = []
+
+[project.optional-dependencies]
+celery = ["celery>=5.3"]
+json-logging = ["python-json-logger>=2.0"]
+dev = [
+    "pytest>=7.0",
+    "celery>=5.3",
+    "python-json-logger>=2.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["expardus_tracing*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

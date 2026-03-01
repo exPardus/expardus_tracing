@@ -1,0 +1,77 @@
+"""Tests for expardus_tracing.logging module."""
+from __future__ import annotations
+
+import logging
+
+import pytest
+
+from expardus_tracing.context import clear_trace_context, set_trace_context
+from expardus_tracing.logging import TraceContextFilter, get_logger, setup_logging
+
+
+class TestTraceContextFilter:
+    def setup_method(self):
+        clear_trace_context()
+
+    def teardown_method(self):
+        clear_trace_context()
+
+    def test_filter_no_context(self):
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        result = filt.filter(record)
+        assert result is True
+        assert record.trace_id == ""  # type: ignore[attr-defined]
+        assert record.span_id == ""  # type: ignore[attr-defined]
+
+    def test_filter_with_context(self):
+        set_trace_context(trace_id="a" * 32, span_id="b" * 16)
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        filt.filter(record)
+        assert record.trace_id == "a" * 32  # type: ignore[attr-defined]
+        assert record.span_id == "b" * 16  # type: ignore[attr-defined]
+
+    def test_filter_adds_service_info(self):
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        filt.filter(record)
+        assert hasattr(record, "service")
+        assert hasattr(record, "env")
+        assert hasattr(record, "release")
+
+    def test_filter_extra_fields(self):
+        set_trace_context(user_id="42")
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        filt.filter(record)
+        assert record.user_id == "42"  # type: ignore[attr-defined]
+
+    def test_filter_does_not_overwrite_existing(self):
+        set_trace_context(name="trace_name")
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        # name is already on LogRecord
+        original_name = record.name
+        filt.filter(record)
+        assert record.name == original_name
+
+
+class TestGetLogger:
+    def test_returns_logger(self):
+        log = get_logger("mymodule")
+        assert isinstance(log, logging.Logger)
+        assert log.name == "mymodule"
+
+
+class TestSetupLogging:
+    def test_setup_configures_root(self):
+        """setup_logging should configure root logger handlers."""
+        original_handlers = logging.root.handlers[:]
+        try:
+            setup_logging(service_name="test-service")
+            assert len(logging.root.handlers) == 1
+            handler = logging.root.handlers[0]
+            assert any(isinstance(f, TraceContextFilter) for f in handler.filters)
+        finally:
+            logging.root.handlers = original_handlers
