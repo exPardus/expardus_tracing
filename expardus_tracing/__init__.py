@@ -48,6 +48,7 @@ from .context import (  # noqa: E402, F401
     bind_context,
     trace_context_scope,
     trace_span,
+    traced,
 )
 
 # =============================================================================
@@ -55,7 +56,10 @@ from .context import (  # noqa: E402, F401
 # =============================================================================
 from .w3c import (  # noqa: E402, F401
     parse_traceparent,
+    parse_traceparent_full,
     format_traceparent,
+    parse_tracestate,
+    format_tracestate,
 )
 
 # =============================================================================
@@ -70,6 +74,7 @@ from .headers import (  # noqa: E402, F401
     get_celery_trace_headers,
     get_trace_headers_for_task,
     TRACEPARENT_HEADER,
+    TRACESTATE_HEADER,
     TRACE_ID_HEADER,
     REQUEST_ID_HEADER,
     CELERY_TRACE_ID_KEY,
@@ -113,9 +118,13 @@ __all__ = [
     "bind_context",
     "trace_context_scope",
     "trace_span",
+    "traced",
     # W3C
     "parse_traceparent",
+    "parse_traceparent_full",
     "format_traceparent",
+    "parse_tracestate",
+    "format_tracestate",
     # Headers
     "extract_trace_from_headers",
     "extract_trace_from_celery_headers",
@@ -125,6 +134,7 @@ __all__ = [
     "get_celery_trace_headers",
     "get_trace_headers_for_task",
     "TRACEPARENT_HEADER",
+    "TRACESTATE_HEADER",
     "TRACE_ID_HEADER",
     "REQUEST_ID_HEADER",
     "CELERY_TRACE_ID_KEY",

@@ -8,12 +8,14 @@ All context is stored in a ContextVar for safe concurrent access.
 """
 from __future__ import annotations
 
+import asyncio
+import functools
 import secrets
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, Generator
+from typing import Any, Callable, Generator, TypeVar
 
 # =============================================================================
 # Trace Context Model
@@ -33,6 +35,8 @@ class TraceContext:
     parent_span_id: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
     start_time: float = field(default_factory=time.perf_counter)
+    tracestate: dict[str, str] = field(default_factory=dict)
+    sampled: bool = True
 
 
 # =============================================================================
@@ -89,6 +93,8 @@ def set_trace_context(
     trace_id: str | None = None,
     span_id: str | None = None,
     parent_span_id: str | None = None,
+    tracestate: dict[str, str] | None = None,
+    sampled: bool = True,
     **extra: Any,
 ) -> TraceContext:
     """Set trace context for the current execution scope."""
@@ -97,6 +103,8 @@ def set_trace_context(
         span_id=span_id or generate_span_id(),
         parent_span_id=parent_span_id,
         extra=extra,
+        tracestate=tracestate or {},
+        sampled=sampled,
     )
     _trace_context.set(ctx)
     return ctx
@@ -146,6 +154,8 @@ def trace_context_scope(
     trace_id: str | None = None,
     span_id: str | None = None,
     parent_span_id: str | None = None,
+    tracestate: dict[str, str] | None = None,
+    sampled: bool = True,
     **extra: Any,
 ) -> Generator[TraceContext, None, None]:
     """
@@ -157,7 +167,10 @@ def trace_context_scope(
             logger.info("Processing", extra={"trace_id": ctx.trace_id})
     """
     previous = _trace_context.get()
-    ctx = set_trace_context(trace_id, span_id, parent_span_id, **extra)
+    ctx = set_trace_context(
+        trace_id, span_id, parent_span_id,
+        tracestate=tracestate, sampled=sampled, **extra,
+    )
     try:
         yield ctx
     finally:
@@ -186,10 +199,15 @@ def trace_span(
     parent = get_trace_context()
     parent_trace_id = parent.trace_id if parent else None
     parent_span_id = parent.span_id if parent else None
+    parent_tracestate = parent.tracestate if parent else None
+    parent_sampled = parent.sampled if parent else True
 
     ctx = set_trace_context(
         trace_id=parent_trace_id,
         parent_span_id=parent_span_id,
+        tracestate=parent_tracestate,
+        sampled=parent_sampled,
+        operation=operation,
         **extra,
     )
     try:
@@ -200,3 +218,51 @@ def trace_span(
             _trace_context.set(parent)
         else:
             clear_trace_context()
+
+
+# =============================================================================
+# Decorator API
+# =============================================================================
+
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+
+def traced(operation: str, **static_extra: Any) -> Callable[[_F], _F]:
+    """
+    Decorator that wraps a function in a :func:`trace_span`.
+
+    Supports both sync and async functions. Creates a child span with the
+    given operation name each time the function is called.
+
+    Usage::
+
+        @traced("process_order")
+        def process_order(order_id):
+            # ... function body is automatically spanned
+            pass
+
+        @traced("fetch_data")
+        async def fetch_data(url):
+            # ... async body is automatically spanned
+            pass
+    """
+
+    def decorator(func: _F) -> _F:
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with trace_span(operation, **static_extra):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper  # type: ignore[return-value]
+        else:
+
+            @functools.wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with trace_span(operation, **static_extra):
+                    return func(*args, **kwargs)
+
+            return sync_wrapper  # type: ignore[return-value]
+
+    return decorator

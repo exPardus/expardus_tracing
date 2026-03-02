@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import OrderedDict
 from typing import Any
 
 from .context import (
@@ -20,6 +21,18 @@ from .headers import (
     get_trace_headers_for_task,
 )
 
+# M1: Idempotency guard — prevents duplicate signal registration
+_celery_tracing_initialized: bool = False
+
+# M6: Maximum number of active OTel spans tracked before FIFO eviction
+_MAX_ACTIVE_SPANS: int = 10_000
+
+
+def _reset_celery_tracing() -> None:
+    """Reset the idempotency guard. **Test-only** — do not call in production."""
+    global _celery_tracing_initialized
+    _celery_tracing_initialized = False
+
 
 def setup_celery_tracing(app: Any) -> None:
     """
@@ -30,6 +43,14 @@ def setup_celery_tracing(app: Any) -> None:
         app = Celery("my_worker")
         setup_celery_tracing(app)
     """
+    global _celery_tracing_initialized
+    if _celery_tracing_initialized:
+        logging.getLogger("celery.tracing").warning(
+            "setup_celery_tracing() called more than once — skipping"
+        )
+        return
+    _celery_tracing_initialized = True
+
     from celery.signals import (
         task_prerun,
         task_postrun,
@@ -58,22 +79,22 @@ def setup_celery_tracing(app: Any) -> None:
 
     _logger = logging.getLogger("celery.tracing")
 
-    # Store active OTel spans per task_id
-    _active_spans: dict[str, Any] = {}
+    # Store active OTel spans per task_id (M6: OrderedDict with max-size guard)
+    _active_spans: OrderedDict[str, Any] = OrderedDict()
 
     # NOTE: weak=False is critical — inner functions would be GC'd otherwise
     # because they are local closures inside setup_celery_tracing.
 
-    @before_task_publish.connect(weak=False)
-    def inject_trace_headers(sender=None, headers=None, **kwargs):  # noqa: E501
+    @before_task_publish.connect(weak=False)  # type: ignore[misc]
+    def inject_trace_headers(sender: Any = None, headers: dict[str, Any] | None = None, **kwargs: Any) -> None:  # noqa: E501
         if headers is not None:
             trace_headers = get_trace_headers_for_task()
             headers.update(trace_headers)
 
-    @task_prerun.connect(weak=False)
+    @task_prerun.connect(weak=False)  # type: ignore[misc]
     def task_prerun_handler(  # noqa: E501
-        sender=None, task_id=None, task=None, args=None, kwargs=None, **kw
-    ):
+        sender: Any = None, task_id: str | None = None, task: Any = None, args: Any = None, kwargs: Any = None, **kw: Any
+    ) -> None:
         request = task.request if task else None
         headers = getattr(request, "headers", None) or {}
 
@@ -88,8 +109,17 @@ def setup_celery_tracing(app: Any) -> None:
 
         if _otel_bridge:
             try:
-                span = start_celery_span(sender or "", task_id or "", trace_id=ctx.trace_id)
-                _active_spans[task_id] = span
+                _tid = task_id or ""
+                span = start_celery_span(sender or "", _tid, trace_id=ctx.trace_id)
+                _active_spans[_tid] = span
+                # M6: Evict oldest entry if dict exceeds max size
+                if len(_active_spans) > _MAX_ACTIVE_SPANS:
+                    orphan_id, orphan_span = _active_spans.popitem(last=False)
+                    _logger.warning(
+                        "Evicted orphan span (active_spans exceeded %d)",
+                        _MAX_ACTIVE_SPANS,
+                        extra={"task_id": orphan_id},
+                    )
             except Exception:
                 pass
 
@@ -104,17 +134,17 @@ def setup_celery_tracing(app: Any) -> None:
             },
         )
 
-    @task_postrun.connect(weak=False)
+    @task_postrun.connect(weak=False)  # type: ignore[misc]
     def task_postrun_handler(  # noqa: E501
-        sender=None, task_id=None, task=None, retval=None, state=None, **kwargs
-    ):
+        sender: Any = None, task_id: str | None = None, task: Any = None, retval: Any = None, state: str | None = None, **kwargs: Any
+    ) -> None:
         ctx = get_trace_context()
         latency_ms = (time.perf_counter() - ctx.start_time) * 1000 if ctx else 0
 
         if _otel_bridge and task_id in _active_spans:
             try:
                 end_celery_span(
-                    _active_spans.pop(task_id),
+                    _active_spans.pop(task_id or ""),
                     task_name=sender or "",
                     status=state or "SUCCESS",
                     latency_ms=latency_ms,
@@ -140,17 +170,17 @@ def setup_celery_tracing(app: Any) -> None:
         )
         clear_trace_context()
 
-    @task_failure.connect(weak=False)
+    @task_failure.connect(weak=False)  # type: ignore[misc]
     def task_failure_handler(  # noqa: E501
-        sender=None, task_id=None, exception=None, traceback=None, **kwargs
-    ):
+        sender: Any = None, task_id: str | None = None, exception: BaseException | None = None, traceback: Any = None, **kwargs: Any
+    ) -> None:
         ctx = get_trace_context()
         latency_ms = (time.perf_counter() - ctx.start_time) * 1000 if ctx else 0
 
         if _otel_bridge and task_id in _active_spans:
             try:
                 end_celery_span(
-                    _active_spans.pop(task_id),
+                    _active_spans.pop(task_id or ""),
                     task_name=sender or "",
                     status="FAILURE",
                     latency_ms=latency_ms,
@@ -177,9 +207,11 @@ def setup_celery_tracing(app: Any) -> None:
             },
             exc_info=True,
         )
+        # M2: Clear trace context on failure to prevent leaks
+        clear_trace_context()
 
-    @task_retry.connect(weak=False)
-    def task_retry_handler(sender=None, request=None, reason=None, **kwargs):
+    @task_retry.connect(weak=False)  # type: ignore[misc]
+    def task_retry_handler(sender: Any = None, request: Any = None, reason: Any = None, **kwargs: Any) -> None:
         ctx = get_trace_context()
         _logger.warning(
             "Task retrying",

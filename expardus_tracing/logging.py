@@ -68,7 +68,10 @@ def setup_logging(service_name: str | None = None) -> None:
 
     if log_json:
         try:
-            from pythonjsonlogger.jsonlogger import JsonFormatter
+            try:
+                from pythonjsonlogger.json import JsonFormatter
+            except ImportError:
+                from pythonjsonlogger.jsonlogger import JsonFormatter
 
             handler.setFormatter(
                 JsonFormatter(
