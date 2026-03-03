@@ -2,6 +2,10 @@
 
 <!-- AI_CONTEXT_FLAG: COPILOT_INSTRUCTIONS -->
 
+## Project
+
+**exPardus** is a universal marketplace platform for buying and selling anything — not limited to any specific category. It is built to grow and expand into new services over time. This repo (`expardus_tracing`) is the shared distributed tracing library for the exPardus ecosystem.
+
 ## Start Here
 *   **Read**: `AGENTS.md` (Root rules)
 *   **Read**: `README.md` (Library overview and API)

@@ -4,7 +4,7 @@
 
 ## Purpose / Scope
 This file provides context for AI assistants, LLMs, and automated agents working on the `expardus_tracing` repository.
-This is a **shared Python library** providing distributed tracing, W3C trace context propagation, and structured logging for the exPardus ecosystem.
+This is a **shared Python library** providing distributed tracing, W3C trace context propagation, and structured logging for the **exPardus** ecosystem — a universal marketplace platform for buying and selling anything, built to expand into new services over time.
 
 ## Deployment Context
 

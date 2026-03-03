@@ -1,6 +1,7 @@
 # expardus-tracing
 
 Shared distributed tracing library for the **exPardus** ecosystem.
+**exPardus** is a universal marketplace platform for buying and selling anything, built to expand into new services over time.
 
 Provides zero-dependency, `ContextVar`-based trace context management with optional Celery and structured logging integrations.
 
