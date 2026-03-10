@@ -13,6 +13,10 @@ This is a **shared Python library** providing distributed tracing, W3C trace con
 - `celery_backround_workers` (Celery workers)
 - `expardus_telegram_bot` (Telegram bot)
 
+**Canonical Domain Access Policy (ecosystem-wide):**
+- OnRender domains are disabled. Do not use any `*.onrender.com` domain for access.
+- Use only: `expardus.com`, `admin.expardus.com`, `api.expardus.com`, `auth.expardus.com`.
+
 **Install extras:**
 - `pip install expardus-tracing` — Core
 - `pip install expardus-tracing[celery]` — Celery signal-based tracing

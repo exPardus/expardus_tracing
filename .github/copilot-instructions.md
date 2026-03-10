@@ -14,6 +14,11 @@
 
 This is a **shared Python library** (`expardus-tracing`) providing distributed tracing, W3C trace context propagation, and structured logging for the exPardus ecosystem. It is NOT a deployed service — it is installed as a pip dependency by other services.
 
+## Canonical Domain Access Policy (Ecosystem)
+
+- All `*.onrender.com` domains are disabled and must not be used for access, links, callbacks, or docs.
+- Only canonical domains are allowed: `expardus.com`, `admin.expardus.com`, `api.expardus.com`, and `auth.expardus.com`.
+
 ## Installation Extras
 *   `pip install expardus-tracing` — Core (W3C headers, context propagation)
 *   `pip install expardus-tracing[celery]` — Celery signal-based tracing
