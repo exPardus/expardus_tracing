@@ -12,9 +12,6 @@ from typing import Any
 
 from .context import get_trace_context
 
-# Re-use module-level config (can be overridden via setup_logging)
-_service_name: str = os.environ.get("SERVICE_NAME", "expardus")
-
 
 class TraceContextFilter(logging.Filter):
     """Logging filter that injects trace context fields into log records."""
@@ -32,7 +29,7 @@ class TraceContextFilter(logging.Filter):
             record.span_id = ctx.span_id or ""  # type: ignore[attr-defined]
             record.parent_span_id = ctx.parent_span_id or ""  # type: ignore[attr-defined]
             for key, value in ctx.extra.items():
-                if not hasattr(record, key):
+                if not hasattr(record, key) and not key.startswith("_"):
                     setattr(record, key, value)
         else:
             record.trace_id = ""  # type: ignore[attr-defined]

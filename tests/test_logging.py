@@ -56,6 +56,19 @@ class TestTraceContextFilter:
         filt.filter(record)
         assert record.name == original_name
 
+    def test_filter_rejects_underscore_prefixed_extra_keys(self):
+        """SEC-ET-001: Extra keys starting with _ must not be set on log records."""
+        set_trace_context(__class__="evil", _private="hidden", safe_key="ok")
+        filt = TraceContextFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+        original_class = record.__class__
+        filt.filter(record)
+        # Dunder keys must NOT be injected
+        assert record.__class__ is original_class
+        assert not hasattr(record, "_private")
+        # Safe keys must be injected
+        assert record.safe_key == "ok"  # type: ignore[attr-defined]
+
 
 class TestGetLogger:
     def test_returns_logger(self):
