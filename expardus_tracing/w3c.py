@@ -12,6 +12,15 @@ tracestate format: ``key1=value1,key2=value2``
 from __future__ import annotations
 
 
+def _is_valid_hex(s: str) -> bool:
+    """Check if a string contains only hexadecimal characters."""
+    try:
+        int(s, 16)
+        return True
+    except ValueError:
+        return False
+
+
 def parse_traceparent(traceparent: str | None) -> tuple[str | None, str | None]:
     """
     Parse a W3C traceparent header.
@@ -19,31 +28,8 @@ def parse_traceparent(traceparent: str | None) -> tuple[str | None, str | None]:
     Returns:
         (trace_id, parent_span_id) or (None, None) if invalid/missing.
     """
-    if not traceparent:
-        return None, None
-
-    try:
-        parts = traceparent.split("-")
-        if len(parts) != 4 or parts[0] != "00":
-            return None, None
-
-        trace_id, parent_span_id = parts[1], parts[2]
-
-        if len(trace_id) != 32 or not all(
-            c in "0123456789abcdef" for c in trace_id.lower()
-        ):
-            return None, None
-        if trace_id == "0" * 32:
-            return None, None
-
-        if len(parent_span_id) != 16 or not all(
-            c in "0123456789abcdef" for c in parent_span_id.lower()
-        ):
-            return None, None
-
-        return trace_id.lower(), parent_span_id.lower()
-    except Exception:
-        return None, None
+    tid, sid, _ = parse_traceparent_full(traceparent)
+    return tid, sid
 
 
 def format_traceparent(
@@ -74,16 +60,12 @@ def parse_traceparent_full(
 
         trace_id, parent_span_id, flags_str = parts[1], parts[2], parts[3]
 
-        if len(trace_id) != 32 or not all(
-            c in "0123456789abcdef" for c in trace_id.lower()
-        ):
+        if len(trace_id) != 32 or not _is_valid_hex(trace_id):
             return None, None, True
         if trace_id == "0" * 32:
             return None, None, True
 
-        if len(parent_span_id) != 16 or not all(
-            c in "0123456789abcdef" for c in parent_span_id.lower()
-        ):
+        if len(parent_span_id) != 16 or not _is_valid_hex(parent_span_id):
             return None, None, True
 
         # Parse flags — bit 0 is the sampled flag
@@ -110,6 +92,10 @@ def parse_tracestate(header: str | None) -> dict[str, str]:
     The tracestate header carries vendor-specific trace context as
     comma-separated ``key=value`` members.
 
+    Keys starting with ``_`` are rejected (defense-in-depth against
+    dunder attribute injection when values are later set on log records).
+    At most 32 members are accepted per the W3C specification.
+
     Returns:
         A dict of key-value pairs. Empty dict if header is absent or empty.
     """
@@ -122,8 +108,10 @@ def parse_tracestate(header: str | None) -> dict[str, str]:
             key, value = member.split("=", 1)
             key = key.strip()
             value = value.strip()
-            if key:  # skip empty keys
+            if key and not key.startswith("_") and len(key) <= 256 and len(value) <= 256:
                 result[key] = value
+                if len(result) >= 32:
+                    break
     return result
 
 

@@ -181,6 +181,39 @@ class TestParseTracestate:
         result = parse_tracestate("invalid,real=data")
         assert result == {"real": "data"}
 
+    def test_dunder_keys_rejected(self):
+        """SEC-ET-002: Keys starting with _ must be rejected."""
+        result = parse_tracestate("__class__=evil,__dict__=bad,good=ok")
+        assert "__class__" not in result
+        assert "__dict__" not in result
+        assert result == {"good": "ok"}
+
+    def test_underscore_prefix_keys_rejected(self):
+        """Keys starting with _ (including single underscore) are rejected."""
+        result = parse_tracestate("_private=1,good=2")
+        assert "_private" not in result
+        assert result == {"good": "2"}
+
+    def test_max_32_members(self):
+        """SEC-ET-003: At most 32 tracestate members accepted."""
+        header = ",".join(f"k{i}=v{i}" for i in range(50))
+        result = parse_tracestate(header)
+        assert len(result) == 32
+
+    def test_key_length_limit(self):
+        """SEC-ET-003: Keys longer than 256 chars are rejected."""
+        long_key = "k" * 300
+        result = parse_tracestate(f"{long_key}=value,good=ok")
+        assert long_key not in result
+        assert result == {"good": "ok"}
+
+    def test_value_length_limit(self):
+        """SEC-ET-003: Values longer than 256 chars are rejected."""
+        long_value = "v" * 300
+        result = parse_tracestate(f"key={long_value},good=ok")
+        assert "key" not in result
+        assert result == {"good": "ok"}
+
 
 class TestFormatTracestate:
     def test_empty_dict(self):

@@ -78,10 +78,15 @@ def extract_trace_from_headers(
 
 
 def _is_valid_trace_id(trace_id: str) -> bool:
-    """Accept 16 or 32 hex chars."""
+    """Accept 16 or 32 hex chars (reject all-zeros per W3C spec)."""
     if len(trace_id) not in (16, 32):
         return False
-    return all(c in "0123456789abcdefABCDEF" for c in trace_id)
+    try:
+        int(trace_id, 16)
+    except ValueError:
+        return False
+    # W3C spec: all-zero trace IDs are invalid
+    return trace_id != "0" * len(trace_id)
 
 
 # =============================================================================
