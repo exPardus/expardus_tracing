@@ -53,6 +53,8 @@ with bind_context(user_id="42"):
     do_work()
 ```
 
+> **Security note:** Fields passed to `bind_context()` or `set_trace_context(**extra)` are injected into **every log record** within that scope. Do **not** bind PII (emails, IPs, passwords, tokens) — use opaque identifiers (user IDs, trace IDs) instead. Keys starting with `_` are silently dropped by `TraceContextFilter` as a defense-in-depth measure.
+
 ## Celery Integration
 
 ```python
