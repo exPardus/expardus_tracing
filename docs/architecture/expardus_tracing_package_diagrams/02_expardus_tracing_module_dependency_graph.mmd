@@ -1,0 +1,36 @@
+%%{init: {'theme': 'default'}}%%
+graph TD
+    subgraph "expardus_tracing package"
+        INIT["__init__.py<br/>(public API, config)"]
+        CTX["context.py<br/>(TraceContext, ContextVar)"]
+        W3C["w3c.py<br/>(traceparent parse/format)"]
+        HDR["headers.py<br/>(HTTP + Celery headers)"]
+        LOG["logging.py<br/>(TraceContextFilter)"]
+        CEL["celery.py<br/>(signal handlers)"]
+    end
+
+    INIT --> CTX
+    INIT --> W3C
+    INIT --> HDR
+    INIT --> LOG
+    INIT --> CEL
+
+    HDR --> CTX
+    HDR --> W3C
+    LOG --> CTX
+    CEL --> CTX
+    CEL --> HDR
+
+    subgraph "Consumers"
+        BW["bot_worker/tracing.py<br/>(re-export shim)"]
+        GW["general_worker/tracing.py<br/>(re-export shim)"]
+        MW["media_worker/tracing.py<br/>(re-export shim)"]
+        BOT["telegram_bot/app/tracing.py<br/>(wrapper + OTel extras)"]
+        API["django_app/apps/common/tracing.py<br/>(standalone — NOT migrated)"]
+    end
+
+    BW --> INIT
+    GW --> INIT
+    MW --> INIT
+    BOT --> INIT
+    API -.->|"duplicates logic"| INIT

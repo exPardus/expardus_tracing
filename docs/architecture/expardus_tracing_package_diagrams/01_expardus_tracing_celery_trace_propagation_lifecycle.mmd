@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant P as Producer Service
+    participant B as Celery Broker (Redis)
+    participant W as Worker Process
+
+    Note over P: set_trace_context(trace_id, span_id)
+
+    P->>P: task.delay() / apply_async()
+    P->>P: before_task_publish signal fires
+    P->>P: inject_trace_headers() → adds trace_id,<br/>parent_span_id, traceparent to message headers
+
+    P->>B: Publish task message (with trace headers)
+
+    B->>W: Deliver message
+
+    W->>W: task_prerun signal fires
+    W->>W: extract_trace_from_task_headers(request.headers)
+    W->>W: set_trace_context(trace_id, parent_span_id,<br/>task_id, task_name)
+    W->>W: Log "Task started" with trace_id
+
+    Note over W: Task body executes<br/>(TraceContextFilter injects trace_id<br/>into all log records)
+
+    alt Success
+        W->>W: task_postrun signal fires
+        W->>W: Log "Task completed" with latency_ms
+        W->>W: clear_trace_context()
+    else Failure
+        W->>W: task_failure signal fires
+        W->>W: Log "Task failed" with error info
+        Note over W: ⚠️ clear_trace_context() NOT called (bug)
+    else Retry
+        W->>W: task_retry signal fires
+        W->>W: Log "Task retrying" with retry_reason
+    end

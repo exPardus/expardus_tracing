@@ -1,0 +1,9 @@
+graph TD
+    ROOT["set_trace_context()<br/>trace_id=aaa...a<br/>span_id=111...1"]
+    S1["trace_span('db_query')<br/>trace_id=aaa...a<br/>span_id=222...2<br/>parent_span_id=111...1"]
+    S2["trace_span('cache_lookup')<br/>trace_id=aaa...a<br/>span_id=333...3<br/>parent_span_id=222...2"]
+
+    ROOT --> S1
+    S1 --> S2
+    S2 -->|"exit"| S1
+    S1 -->|"exit"| ROOT

@@ -1,0 +1,18 @@
+flowchart TD
+    START["Inbound HTTP Headers"] --> TP{"traceparent<br/>header present?"}
+    TP -->|Yes| PARSE["parse_traceparent()"]
+    PARSE --> VALID{"Valid W3C<br/>format?"}
+    VALID -->|Yes| DONE["Return (trace_id, parent_span_id)"]
+    VALID -->|No| XTI
+
+    TP -->|No| XTI{"x-trace-id<br/>present?"}
+    XTI -->|Yes| HEXCHECK{"16 or 32 hex<br/>chars?"}
+    HEXCHECK -->|Yes| DONE2["Return (trace_id, None)"]
+    HEXCHECK -->|No| XRI
+
+    XTI -->|No| XRI{"x-request-id<br/>present?"}
+    XRI -->|Yes| HEXCHECK2{"16 or 32 hex<br/>chars?"}
+    HEXCHECK2 -->|Yes| DONE3["Return (request_id, None)"]
+    HEXCHECK2 -->|No| NONE["Return (None, None)"]
+
+    XRI -->|No| NONE
