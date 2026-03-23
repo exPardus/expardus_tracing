@@ -280,3 +280,45 @@ TraceContextFilter, get_logger, setup_logging
 # Celery
 setup_celery_tracing
 ```
+
+---
+
+## 9. Open Questions & Design Notes
+
+### Resolved in v0.1.0
+
+**OQ-1: Version number mismatch**
+- Previously: `pyproject.toml` said `0.2.0` but package never formally released
+- **Resolution**: Set to `0.1.0` as first release
+
+**OQ-2: API repo not migrated**
+- Previously: `expardus_api/django_app/apps/common/tracing.py` (556 lines) was standalone duplicate not using the shared package
+- **Resolution**: M4 (medium improvements) converted to thin wrapper re-exporting from `expardus_tracing` while keeping API-specific `parse_traceparent_full()` local
+
+**OQ-3: `get_trace_headers` vs `get_http_trace_headers` casing**
+- Previously: Both existed with different header name casing (`"x-trace-id"` vs `"X-Trace-ID"`)
+- **Resolution**: Both now use consistent header name constants from `headers.py`
+
+**OQ-4: Should `task_failure` clear trace context?**
+- Previously: `task_postrun` called `clear_trace_context()` but `task_failure` did not
+- **Resolution**: M2 (medium improvements) added `clear_trace_context()` to `task_failure_handler` to prevent context leakage on crash
+
+**OQ-8: No `py.typed` marker**
+- Previously: Package had type hints throughout but no PEP 561 marker
+- **Resolution**: S2 (strategic improvements) added `py.typed` and `[tool.mypy]` configuration; mypy strict mode passes
+
+### Pending (Low Priority)
+
+**OQ-5: Is `trace_span` `operation` parameter intentionally ignored?**
+- Status: Currently accepted but never stored
+- Future: Could store in `ctx.extra["operation"]` for instrumentation
+- Priority: Low — low-impact enhancement
+
+**OQ-6: Should the package support Python 3.9?**
+- Status: Currently requires `>=3.10`. All features use 3.10+ syntax.
+- Resolution: Check consumer repo Python versions. Currently pinned to 3.10 across all services.
+
+**OQ-7: Should `CELERY_SPAN_ID_KEY = "parent_span_id"` be renamed?**
+- Status: Name is misleading — on producer side it's current span ID sent as child's parent
+- Risk: Don't rename for v0.1.0 (would break existing Celery messages in flight)
+- Future: Consider renaming in v1.0 with migration guide
