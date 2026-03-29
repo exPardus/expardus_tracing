@@ -98,11 +98,12 @@ def setup_celery_tracing(app: Any) -> None:
         request = task.request if task else None
         headers = getattr(request, "headers", None) or {}
 
-        trace_id, parent_span_id = extract_trace_from_task_headers(headers)
+        trace_id, parent_span_id, tracestate = extract_trace_from_task_headers(headers)
 
         ctx = set_trace_context(
             trace_id=trace_id,
             parent_span_id=parent_span_id,
+            tracestate=tracestate or None,
             task_id=task_id,
             task_name=sender,
         )

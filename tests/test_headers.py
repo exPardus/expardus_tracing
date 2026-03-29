@@ -93,18 +93,18 @@ class TestExtractTraceFromHeaders:
 
 class TestExtractCeleryHeaders:
     def test_none(self):
-        assert extract_trace_from_celery_headers(None) == (None, None)
+        assert extract_trace_from_celery_headers(None) == (None, None, {})
 
     def test_traceparent(self):
         headers = {
             CELERY_TRACEPARENT_KEY: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         }
-        tid, psid = extract_trace_from_celery_headers(headers)
+        tid, psid, ts = extract_trace_from_celery_headers(headers)
         assert tid == "0af7651916cd43dd8448eb211c80319c"
 
     def test_simple_trace_id(self):
         headers = {CELERY_TRACE_ID_KEY: "e" * 32}
-        tid, psid = extract_trace_from_celery_headers(headers)
+        tid, psid, ts = extract_trace_from_celery_headers(headers)
         assert tid == "e" * 32
         assert psid is None
 
@@ -113,7 +113,7 @@ class TestExtractCeleryHeaders:
             CELERY_TRACE_ID_KEY: "f" * 32,
             CELERY_SPAN_ID_KEY: "1" * 16,
         }
-        tid, psid = extract_trace_from_celery_headers(headers)
+        tid, psid, ts = extract_trace_from_celery_headers(headers)
         assert tid == "f" * 32
         assert psid == "1" * 16
 
@@ -189,7 +189,7 @@ class TestGetCeleryTraceHeaders:
         """Headers produced by get_celery_trace_headers should be parseable."""
         set_trace_context(trace_id="a" * 32, span_id="b" * 16)
         headers = get_celery_trace_headers()
-        tid, psid = extract_trace_from_celery_headers(headers)
+        tid, psid, ts = extract_trace_from_celery_headers(headers)
         assert tid == "a" * 32
         assert psid == "b" * 16
 

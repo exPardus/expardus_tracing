@@ -27,6 +27,7 @@ REQUEST_ID_HEADER = "x-request-id"
 CELERY_TRACE_ID_KEY = "trace_id"
 CELERY_SPAN_ID_KEY = "parent_span_id"
 CELERY_TRACEPARENT_KEY = "traceparent"
+CELERY_TRACESTATE_KEY = "tracestate"
 
 
 # =============================================================================
@@ -127,29 +128,33 @@ def get_http_trace_headers() -> dict[str, str]:
 
 def extract_trace_from_celery_headers(
     headers: Mapping[str, Any] | None,
-) -> tuple[str | None, str | None]:
+) -> tuple[str | None, str | None, dict[str, str]]:
     """
     Extract trace context from Celery task headers.
 
     Returns:
-        (trace_id, parent_span_id)
+        (trace_id, parent_span_id, tracestate)
     """
     if not headers:
-        return None, None
+        return None, None, {}
+
+    # Extract tracestate regardless of traceparent source
+    tracestate_raw = headers.get(CELERY_TRACESTATE_KEY)
+    tracestate = parse_tracestate(str(tracestate_raw)) if tracestate_raw else {}
 
     traceparent = headers.get(CELERY_TRACEPARENT_KEY)
     if traceparent:
         tid, psid = parse_traceparent(str(traceparent))
         if tid:
-            return tid, psid
+            return tid, psid, tracestate
 
     trace_id = headers.get(CELERY_TRACE_ID_KEY)
     parent_span_id = headers.get(CELERY_SPAN_ID_KEY)
 
     if trace_id:
-        return str(trace_id), str(parent_span_id) if parent_span_id else None
+        return str(trace_id), str(parent_span_id) if parent_span_id else None, tracestate
 
-    return None, None
+    return None, None, tracestate
 
 
 # Alias used by media_worker (same behaviour)
@@ -179,6 +184,8 @@ def get_celery_trace_headers() -> dict[str, str]:
         headers[CELERY_TRACEPARENT_KEY] = format_traceparent(
             ctx.trace_id, ctx.span_id, sampled=ctx.sampled
         )
+    if ctx.tracestate:
+        headers[CELERY_TRACESTATE_KEY] = format_tracestate(ctx.tracestate)
     return headers
 
 
