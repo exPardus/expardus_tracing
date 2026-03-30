@@ -187,6 +187,6 @@ class TestCeleryHeaderFormat:
         set_trace_context(trace_id="a" * 32, span_id="b" * 16)
         headers = get_celery_trace_headers()
 
-        tid, psid, ts = extract_trace_from_celery_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_celery_headers(headers)
         assert tid == "a" * 32
         assert psid == "b" * 16

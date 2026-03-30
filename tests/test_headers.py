@@ -24,29 +24,29 @@ from expardus_tracing.headers import (
 
 class TestExtractTraceFromHeaders:
     def test_none_headers(self):
-        assert extract_trace_from_headers(None) == (None, None, {})
+        assert extract_trace_from_headers(None) == (None, None, {}, True)
 
     def test_empty_headers(self):
-        assert extract_trace_from_headers({}) == (None, None, {})
+        assert extract_trace_from_headers({}) == (None, None, {}, True)
 
     def test_traceparent(self):
         headers = {
             "traceparent": "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         }
-        tid, psid, ts = extract_trace_from_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_headers(headers)
         assert tid == "0af7651916cd43dd8448eb211c80319c"
         assert psid == "b7ad6b7169203331"
         assert ts == {}
 
     def test_x_trace_id(self):
         headers = {"x-trace-id": "a" * 32}
-        tid, psid, ts = extract_trace_from_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_headers(headers)
         assert tid == "a" * 32
         assert psid is None
 
     def test_x_request_id(self):
         headers = {"x-request-id": "b" * 32}
-        tid, psid, ts = extract_trace_from_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_headers(headers)
         assert tid == "b" * 32
         assert psid is None
 
@@ -55,21 +55,21 @@ class TestExtractTraceFromHeaders:
             "traceparent": "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
             "x-trace-id": "c" * 32,
         }
-        tid, _, _ = extract_trace_from_headers(headers)
+        tid, _, _, _ = extract_trace_from_headers(headers)
         assert tid == "0af7651916cd43dd8448eb211c80319c"
 
     def test_case_insensitive(self):
         headers = {"X-Trace-ID": "d" * 32}
-        tid, _, _ = extract_trace_from_headers(headers)
+        tid, _, _, _ = extract_trace_from_headers(headers)
         assert tid == "d" * 32
 
     def test_invalid_trace_id_rejected(self):
         headers = {"x-trace-id": "not-hex"}
-        assert extract_trace_from_headers(headers) == (None, None, {})
+        assert extract_trace_from_headers(headers) == (None, None, {}, True)
 
     def test_16_char_trace_id_accepted(self):
         headers = {"x-trace-id": "a" * 16}
-        tid, _, _ = extract_trace_from_headers(headers)
+        tid, _, _, _ = extract_trace_from_headers(headers)
         assert tid == "a" * 16
 
     def test_tracestate_extracted(self):
@@ -77,7 +77,7 @@ class TestExtractTraceFromHeaders:
             "traceparent": "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
             "tracestate": "vendor1=value1,vendor2=value2",
         }
-        tid, psid, ts = extract_trace_from_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_headers(headers)
         assert tid == "0af7651916cd43dd8448eb211c80319c"
         assert ts == {"vendor1": "value1", "vendor2": "value2"}
 
@@ -86,25 +86,25 @@ class TestExtractTraceFromHeaders:
             "x-trace-id": "a" * 32,
             "tracestate": "key=val",
         }
-        tid, _, ts = extract_trace_from_headers(headers)
+        tid, _, ts, _ = extract_trace_from_headers(headers)
         assert tid == "a" * 32
         assert ts == {"key": "val"}
 
 
 class TestExtractCeleryHeaders:
     def test_none(self):
-        assert extract_trace_from_celery_headers(None) == (None, None, {})
+        assert extract_trace_from_celery_headers(None) == (None, None, {}, True)
 
     def test_traceparent(self):
         headers = {
             CELERY_TRACEPARENT_KEY: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         }
-        tid, psid, ts = extract_trace_from_celery_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_celery_headers(headers)
         assert tid == "0af7651916cd43dd8448eb211c80319c"
 
     def test_simple_trace_id(self):
         headers = {CELERY_TRACE_ID_KEY: "e" * 32}
-        tid, psid, ts = extract_trace_from_celery_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_celery_headers(headers)
         assert tid == "e" * 32
         assert psid is None
 
@@ -113,7 +113,7 @@ class TestExtractCeleryHeaders:
             CELERY_TRACE_ID_KEY: "f" * 32,
             CELERY_SPAN_ID_KEY: "1" * 16,
         }
-        tid, psid, ts = extract_trace_from_celery_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_celery_headers(headers)
         assert tid == "f" * 32
         assert psid == "1" * 16
 
@@ -189,7 +189,7 @@ class TestGetCeleryTraceHeaders:
         """Headers produced by get_celery_trace_headers should be parseable."""
         set_trace_context(trace_id="a" * 32, span_id="b" * 16)
         headers = get_celery_trace_headers()
-        tid, psid, ts = extract_trace_from_celery_headers(headers)
+        tid, psid, ts, sampled = extract_trace_from_celery_headers(headers)
         assert tid == "a" * 32
         assert psid == "b" * 16
 

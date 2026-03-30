@@ -80,6 +80,7 @@ from .headers import (  # noqa: E402, F401
     CELERY_TRACE_ID_KEY,
     CELERY_SPAN_ID_KEY,
     CELERY_TRACEPARENT_KEY,
+    CELERY_TRACESTATE_KEY,
 )
 
 # =============================================================================
@@ -140,6 +141,7 @@ __all__ = [
     "CELERY_TRACE_ID_KEY",
     "CELERY_SPAN_ID_KEY",
     "CELERY_TRACEPARENT_KEY",
+    "CELERY_TRACESTATE_KEY",
     # Logging
     "TraceContextFilter",
     "get_logger",

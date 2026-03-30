@@ -26,9 +26,18 @@ class TestParseTraceparent:
     def test_empty(self):
         assert parse_traceparent("") == (None, None)
 
-    def test_wrong_version(self):
-        assert parse_traceparent(
+    def test_future_version_best_effort(self):
+        """Version '01' should extract data via best-effort forward compatibility."""
+        tid, psid = parse_traceparent(
             "01-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+        )
+        assert tid == "0af7651916cd43dd8448eb211c80319c"
+        assert psid == "b7ad6b7169203331"
+
+    def test_version_ff_rejected(self):
+        """Version 'ff' is invalid per W3C spec and must return (None, None)."""
+        assert parse_traceparent(
+            "ff-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         ) == (None, None)
 
     def test_wrong_parts(self):

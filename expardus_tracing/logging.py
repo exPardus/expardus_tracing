@@ -92,7 +92,11 @@ def setup_logging(service_name: str | None = None) -> None:
             )
         )
 
-    logging.root.handlers = [handler]
+    if not any(
+        any(isinstance(f, TraceContextFilter) for f in h.filters)
+        for h in logging.root.handlers
+    ):
+        logging.root.addHandler(handler)
     logging.root.setLevel(log_level)
 
     # Reduce noise

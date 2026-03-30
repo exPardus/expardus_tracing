@@ -79,12 +79,13 @@ class TestGetLogger:
 
 class TestSetupLogging:
     def test_setup_configures_root(self):
-        """setup_logging should configure root logger handlers."""
+        """setup_logging should add a handler with TraceContextFilter to root logger."""
         original_handlers = logging.root.handlers[:]
         try:
             setup_logging(service_name="test-service")
-            assert len(logging.root.handlers) == 1
-            handler = logging.root.handlers[0]
-            assert any(isinstance(f, TraceContextFilter) for f in handler.filters)
+            assert any(
+                any(isinstance(f, TraceContextFilter) for f in h.filters)
+                for h in logging.root.handlers
+            )
         finally:
             logging.root.handlers = original_handlers

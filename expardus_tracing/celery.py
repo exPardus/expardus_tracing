@@ -79,8 +79,11 @@ def setup_celery_tracing(app: Any) -> None:
 
         init_otel_worker(_svc_name)
         _otel_bridge = True
-    except ImportError:
-        pass
+    except (ImportError, ModuleNotFoundError):
+        pass  # OTel not installed
+    except Exception as e:
+        import logging as _logging
+        _logging.getLogger("expardus_tracing.celery").warning("OTel init failed: %s", e)
 
     _logger = logging.getLogger("celery.tracing")
 
@@ -103,12 +106,13 @@ def setup_celery_tracing(app: Any) -> None:
         request = task.request if task else None
         headers = getattr(request, "headers", None) or {}
 
-        trace_id, parent_span_id, tracestate = extract_trace_from_task_headers(headers)
+        trace_id, parent_span_id, tracestate, sampled = extract_trace_from_task_headers(headers)
 
         ctx = set_trace_context(
             trace_id=trace_id,
             parent_span_id=parent_span_id,
             tracestate=tracestate or None,
+            sampled=sampled,
             task_id=task_id,
             task_name=_sender_name(sender),
         )

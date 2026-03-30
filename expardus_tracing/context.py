@@ -199,7 +199,7 @@ def trace_span(
     parent = get_trace_context()
     parent_trace_id = parent.trace_id if parent else None
     parent_span_id = parent.span_id if parent else None
-    parent_tracestate = parent.tracestate if parent else None
+    parent_tracestate = dict(parent.tracestate) if parent and parent.tracestate else None
     parent_sampled = parent.sampled if parent else True
 
     ctx = set_trace_context(
