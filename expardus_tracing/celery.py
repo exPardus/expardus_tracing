@@ -28,6 +28,11 @@ _celery_tracing_initialized: bool = False
 _MAX_ACTIVE_SPANS: int = 10_000
 
 
+def _sender_name(sender: Any) -> str:
+    """Extract a string task name from ``sender`` (may be a task class or string)."""
+    return getattr(sender, "name", None) or str(sender or "")
+
+
 def _reset_celery_tracing() -> None:
     """Reset the idempotency guard. **Test-only** — do not call in production."""
     global _celery_tracing_initialized
@@ -105,13 +110,13 @@ def setup_celery_tracing(app: Any) -> None:
             parent_span_id=parent_span_id,
             tracestate=tracestate or None,
             task_id=task_id,
-            task_name=sender,
+            task_name=_sender_name(sender),
         )
 
         if _otel_bridge:
             try:
                 _tid = task_id or ""
-                span = start_celery_span(sender or "", _tid, trace_id=ctx.trace_id)
+                span = start_celery_span(_sender_name(sender), _tid, trace_id=ctx.trace_id)
                 _active_spans[_tid] = span
                 # M6: Evict oldest entry if dict exceeds max size
                 if len(_active_spans) > _MAX_ACTIVE_SPANS:
@@ -129,7 +134,7 @@ def setup_celery_tracing(app: Any) -> None:
             extra={
                 "event": "task_start",
                 "task_id": task_id,
-                "task_name": sender,
+                "task_name": _sender_name(sender),
                 "queue": getattr(request, "delivery_info", {}).get("routing_key", ""),
                 "trace_id": ctx.trace_id,
             },
@@ -146,7 +151,7 @@ def setup_celery_tracing(app: Any) -> None:
             try:
                 end_celery_span(
                     _active_spans.pop(task_id or ""),
-                    task_name=sender or "",
+                    task_name=_sender_name(sender),
                     status=state or "SUCCESS",
                     latency_ms=latency_ms,
                 )
@@ -154,7 +159,7 @@ def setup_celery_tracing(app: Any) -> None:
                 pass
         elif _otel_bridge:
             try:
-                record_celery_metric(sender or "", state or "SUCCESS", latency_ms)
+                record_celery_metric(_sender_name(sender), state or "SUCCESS", latency_ms)
             except Exception:
                 pass
 
@@ -163,7 +168,7 @@ def setup_celery_tracing(app: Any) -> None:
             extra={
                 "event": "task_complete",
                 "task_id": task_id,
-                "task_name": sender,
+                "task_name": _sender_name(sender),
                 "state": state,
                 "latency_ms": round(latency_ms, 2),
                 "trace_id": ctx.trace_id if ctx else "",
@@ -182,7 +187,7 @@ def setup_celery_tracing(app: Any) -> None:
             try:
                 end_celery_span(
                     _active_spans.pop(task_id or ""),
-                    task_name=sender or "",
+                    task_name=_sender_name(sender),
                     status="FAILURE",
                     latency_ms=latency_ms,
                     error=exception,
@@ -191,7 +196,7 @@ def setup_celery_tracing(app: Any) -> None:
                 pass
         elif _otel_bridge:
             try:
-                record_celery_metric(sender or "", "FAILURE", latency_ms)
+                record_celery_metric(_sender_name(sender), "FAILURE", latency_ms)
             except Exception:
                 pass
 
@@ -200,7 +205,7 @@ def setup_celery_tracing(app: Any) -> None:
             extra={
                 "event": "task_failure",
                 "task_id": task_id,
-                "task_name": sender,
+                "task_name": _sender_name(sender),
                 "error_type": type(exception).__name__ if exception else "Unknown",
                 "error_message": str(exception)[:500] if exception else "",
                 "latency_ms": round(latency_ms, 2),
@@ -219,7 +224,7 @@ def setup_celery_tracing(app: Any) -> None:
             extra={
                 "event": "task_retry",
                 "task_id": request.id if request else "",
-                "task_name": sender,
+                "task_name": _sender_name(sender),
                 "retry_reason": str(reason)[:200] if reason else "",
                 "retries": request.retries if request else 0,
                 "trace_id": ctx.trace_id if ctx else "",
