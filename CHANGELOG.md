@@ -5,9 +5,9 @@ All notable changes to `expardus-tracing` will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] — 2026-03-XX
+## [Unreleased]
 
-_Changelog entries for 0.1.1–0.1.3 were not recorded at time of release. Current version is 0.1.3 as consumed by expardus\_api, celery\_backround\_workers, and expardus\_telegram\_bot. Test suite has grown to 141+ tests._
+_Changelog entries for 0.1.1–0.1.3 were not recorded at time of release. The exact release date for 0.1.3 is unknown; the entries below document the current 0.1.3 state as consumed by expardus\_api, celery\_background\_workers, and expardus\_telegram\_bot. Test suite has grown to 141+ tests._
 
 ### Changed
 - Version bumped to 0.1.3 in `pyproject.toml`.
