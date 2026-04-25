@@ -130,8 +130,8 @@ def setup_celery_tracing(app: Any) -> None:
                         _MAX_ACTIVE_SPANS,
                         extra={"task_id": orphan_id},
                     )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("OTel span start failed for task %s: %s", _sender_name(sender), exc, exc_info=False)
 
         _logger.info(
             "Task started",
@@ -159,13 +159,13 @@ def setup_celery_tracing(app: Any) -> None:
                     status=state or "SUCCESS",
                     latency_ms=latency_ms,
                 )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("OTel span end failed for task %s: %s", _sender_name(sender), exc, exc_info=False)
         elif _otel_bridge:
             try:
                 record_celery_metric(_sender_name(sender), state or "SUCCESS", latency_ms)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("OTel metric record failed for task %s: %s", _sender_name(sender), exc, exc_info=False)
 
         _logger.info(
             "Task completed",
@@ -196,13 +196,13 @@ def setup_celery_tracing(app: Any) -> None:
                     latency_ms=latency_ms,
                     error=exception,
                 )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("OTel span end failed on task failure %s: %s", _sender_name(sender), exc, exc_info=False)
         elif _otel_bridge:
             try:
                 record_celery_metric(_sender_name(sender), "FAILURE", latency_ms)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning("OTel metric record failed on task failure %s: %s", _sender_name(sender), exc, exc_info=False)
 
         _logger.error(
             "Task failed",
