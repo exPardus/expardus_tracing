@@ -164,7 +164,10 @@ def setup_celery_tracing(app: Any) -> None:
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("OTel span end failed for task %s: %s", _sender_name(sender), exc, exc_info=False)
-        elif _otel_bridge:
+        elif _otel_bridge and state != "FAILURE":
+            # M7: task_failure_handler already recorded the metric (with correct latency)
+            # and cleared trace context for FAILURE tasks.  Skipping here avoids a
+            # duplicate zero-latency sample that would corrupt failure-latency histograms.
             try:
                 record_celery_metric(_sender_name(sender), state or "SUCCESS", latency_ms)
             except Exception as exc:  # noqa: BLE001
