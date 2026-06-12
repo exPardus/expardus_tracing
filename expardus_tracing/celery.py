@@ -7,6 +7,7 @@ task publish → prerun → postrun lifecycle.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import OrderedDict
 from typing import Any
@@ -23,6 +24,7 @@ from .headers import (
 
 # M1: Idempotency guard — prevents duplicate signal registration
 _celery_tracing_initialized: bool = False
+_celery_tracing_lock: threading.Lock = threading.Lock()
 
 # M6: Maximum number of active OTel spans tracked before FIFO eviction
 _MAX_ACTIVE_SPANS: int = 10_000
@@ -36,7 +38,8 @@ def _sender_name(sender: Any) -> str:
 def _reset_celery_tracing() -> None:
     """Reset the idempotency guard. **Test-only** — do not call in production."""
     global _celery_tracing_initialized
-    _celery_tracing_initialized = False
+    with _celery_tracing_lock:
+        _celery_tracing_initialized = False
 
 
 def setup_celery_tracing(app: Any) -> None:
@@ -49,12 +52,13 @@ def setup_celery_tracing(app: Any) -> None:
         setup_celery_tracing(app)
     """
     global _celery_tracing_initialized
-    if _celery_tracing_initialized:
-        logging.getLogger("celery.tracing").warning(
-            "setup_celery_tracing() called more than once — skipping"
-        )
-        return
-    _celery_tracing_initialized = True
+    with _celery_tracing_lock:
+        if _celery_tracing_initialized:
+            logging.getLogger("celery.tracing").warning(
+                "setup_celery_tracing() called more than once — skipping"
+            )
+            return
+        _celery_tracing_initialized = True
 
     from celery.signals import (
         task_prerun,
@@ -82,8 +86,7 @@ def setup_celery_tracing(app: Any) -> None:
     except (ImportError, ModuleNotFoundError):
         pass  # OTel not installed
     except Exception as e:
-        import logging as _logging
-        _logging.getLogger("expardus_tracing.celery").warning("OTel init failed: %s", e)
+        logging.getLogger("expardus_tracing.celery").warning("OTel init failed: %s", e)
 
     _logger = logging.getLogger("celery.tracing")
 
@@ -234,5 +237,8 @@ def setup_celery_tracing(app: Any) -> None:
                 "trace_id": ctx.trace_id if ctx else "",
             },
         )
+        # Clear trace context so a stale span does not leak into the retry attempt.
+        # task_prerun will establish a fresh context when the retry executes.
+        clear_trace_context()
 
     _logger.info("Celery tracing signals registered")

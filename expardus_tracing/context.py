@@ -166,18 +166,19 @@ def trace_context_scope(
         with trace_context_scope(user_id="123") as ctx:
             logger.info("Processing", extra={"trace_id": ctx.trace_id})
     """
-    previous = _trace_context.get()
-    ctx = set_trace_context(
-        trace_id, span_id, parent_span_id,
-        tracestate=tracestate, sampled=sampled, **extra,
+    ctx = TraceContext(
+        trace_id=trace_id or generate_trace_id(),
+        span_id=span_id or generate_span_id(),
+        parent_span_id=parent_span_id,
+        extra=extra,
+        tracestate=tracestate or {},
+        sampled=sampled,
     )
+    token = _trace_context.set(ctx)
     try:
         yield ctx
     finally:
-        if previous:
-            _trace_context.set(previous)
-        else:
-            clear_trace_context()
+        _trace_context.reset(token)
 
 
 @contextmanager
@@ -198,26 +199,23 @@ def trace_span(
     """
     parent = get_trace_context()
     parent_trace_id = parent.trace_id if parent else None
-    parent_span_id = parent.span_id if parent else None
+    parent_span_id_val = parent.span_id if parent else None
     parent_tracestate = dict(parent.tracestate) if parent and parent.tracestate else None
     parent_sampled = parent.sampled if parent else True
 
-    ctx = set_trace_context(
-        trace_id=parent_trace_id,
-        parent_span_id=parent_span_id,
-        tracestate=parent_tracestate,
+    ctx = TraceContext(
+        trace_id=parent_trace_id or generate_trace_id(),
+        span_id=generate_span_id(),
+        parent_span_id=parent_span_id_val,
+        extra={"operation": operation, **extra},
+        tracestate=parent_tracestate or {},
         sampled=parent_sampled,
-        operation=operation,
-        **extra,
     )
+    token = _trace_context.set(ctx)
     try:
         yield ctx
     finally:
-        # Restore parent context
-        if parent:
-            _trace_context.set(parent)
-        else:
-            clear_trace_context()
+        _trace_context.reset(token)
 
 
 # =============================================================================

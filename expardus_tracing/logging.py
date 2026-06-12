@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any
+
+_setup_logging_lock: threading.Lock = threading.Lock()
 
 from .context import get_trace_context
 
@@ -53,7 +56,8 @@ def setup_logging(service_name: str | None = None) -> None:
     import expardus_tracing as _pkg
 
     if service_name:
-        _pkg.SERVICE_NAME = service_name
+        with _setup_logging_lock:
+            _pkg.SERVICE_NAME = service_name
 
     log_json = os.environ.get("LOG_JSON_ENABLED", "true").lower() in ("1", "true", "yes")
     log_level = os.environ.get("LOG_LEVEL", "INFO")

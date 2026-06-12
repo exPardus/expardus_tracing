@@ -68,6 +68,10 @@ def parse_traceparent_full(
 
         version = parts[0]
 
+        # W3C spec: version must be exactly 2 lowercase hex chars
+        if len(version) != 2 or not _is_valid_hex(version):
+            return None, None, True
+
         # version "ff" is invalid per W3C spec
         if version == "ff":
             return None, None, True
@@ -94,11 +98,10 @@ def parse_traceparent_full(
         if parent_span_id == "0" * 16:
             return None, None, True
 
-        # Parse flags — bit 0 is the sampled flag
-        try:
-            flags = int(flags_str, 16)
-        except ValueError:
-            flags = 1  # default sampled
+        # W3C spec: flags must be exactly 2 hex chars; treat invalid as "no context"
+        if len(flags_str) != 2 or not _is_valid_hex(flags_str):
+            return None, None, True
+        flags = int(flags_str, 16)
         sampled = bool(flags & 0x01)
 
         return trace_id.lower(), parent_span_id.lower(), sampled
